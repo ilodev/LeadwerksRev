@@ -1,0 +1,187 @@
+//------------------------------------------------
+//--- 010 Editor v8.0.1 Binary Template
+// This file is part of the LeadwerksRev distribution
+// https://github.com/ilodev/LeadwerksRev or http://LeadwerksRev.github.io).
+// Copyright (c) 2019 Inaki Lopez
+//
+//      File: Leadwerks.mdl.bt
+//    Author: Inaki Lopez
+//   Version: 0.1
+//   Purpose: Leadwerks model (mdl) File parser
+//  Category: Games
+// File Mask: *.mdl
+//  ID Bytes: 
+//   History: 
+//      0.1   2019-02-18 Inaki Lopez: Initial revision
+//------------------------------------------------
+
+typedef enum <int32> {
+    MDL_FILE = 1,
+    MDL_NODE = 2,
+    MDL_MESH = 3,
+    MDL_BONE = 4,
+    MDL_VERTEXARRAY = 5,
+    MDL_INDICEARRAY = 6,
+    MDL_PROPERTIES = 7,
+    MDL_ANIMATIONKEYS = 8,
+    MDL_AABB = 9,
+    MDL_SURFACE = 10,
+    MDL_NEWTONCOLLISIONTREE = 11
+} MDL_BLOCKTYPE;
+
+typedef enum <int32> {
+    MDL_POSITION = 1,
+    MDL_NORMAL = 2,
+    MDL_TEXTURE_COORD = 3,
+    MDL_COLOR = 4,
+    MDL_TANGENT = 5,
+    MDL_BINORMAL = 6,
+    MDL_BONEINDICE = 7,
+    MDL_BONEWEIGHT = 8
+} MDL_DATATYPE;
+
+typedef enum <int32> {
+    MDL_BYTE = 1,
+    MDL_UNSIGNED_BYTE = 2,
+    MDL_SHORT = 3,
+    MDL_UNSIGNED_SHORT = 4,
+    MDL_HALF = 5,
+    MDL_INT = 6,
+    MDL_UNSIGNED_INT = 7,
+    MDL_FLOAT = 8,
+    MDL_DOUBLE = 9
+} MDL_VARTYPE;
+
+typedef enum<int32> {
+    MDL_POINTS = 1,
+    MDL_LINE_STRIP = 2,
+    MDL_LINE_LOOP = 3,
+    MDL_LINES = 4,
+    MDL_TRIANGLE_STRIP = 5,
+    MDL_TRIANGLE_FAN = 6,
+    MDL_TRIANGLES = 7,
+    MDL_QUAD_STRIP = 8,
+    MDL_QUADS = 9,
+    MDL_POLYGON = 10
+} MDL_MESHTYPE;
+
+typedef struct {
+    string means;
+    string value;
+} Property;
+
+// Forward declaration required for nested typedef structs.
+struct Block;
+
+typedef struct {
+    MDL_BLOCKTYPE type;
+    unsigned int32 child_count;
+    unsigned int32 length;     // length in bytes of block data
+    switch(type) {
+        case MDL_FILE:
+            unsigned int32 version;
+            break;
+
+        case MDL_NODE:
+            unsigned char data[length];
+            break;
+
+        case MDL_MESH:
+            struct {
+                float value[16];
+            } matrix;
+            break;
+
+        case MDL_PROPERTIES:
+            unsigned int32 count;
+            struct {    
+                Property items[count]<optimize=false>;
+            } Properties<optimize=false>;
+            break;
+
+        case MDL_SURFACE:
+            break;
+
+        case MDL_VERTEXARRAY:
+            unsigned int32 vertexcount;
+            MDL_DATATYPE datatype;
+            MDL_VARTYPE  vartype;
+            unsigned int32 elementcount;  // Number of vartype per item (e.g. 2 x float values) per vertex
+            if (vartype == MDL_FLOAT) {
+                struct {
+                    struct {
+                        float data[ elementcount];
+                    } item[vertexcount]<optimize=false>;    
+                } vertex<optimize=false>;
+            } else {
+                unsigned char data[length - 4 * sizeof(int32)];
+            }
+            break;
+
+        case MDL_INDICEARRAY:
+            unsigned int32 indexcount;
+            MDL_MESHTYPE meshtype;
+            MDL_VARTYPE  vartype;
+            struct {
+               short data[indexcount];
+            } indexes;
+            break; 
+        
+        default:
+            unsigned char data[length];
+            break;
+    }
+
+    // process nested structs
+    if (child_count) {
+            Block child[child_count]<optimize=false>;
+    }
+
+} Block <optimize=false, read=Block_read>;
+
+string Block_read( local Block &item) {
+local string result = EnumToString(item.type);
+    switch(item.type) {
+        case MDL_FILE:
+            SPrintf (result, "%s version: %d", EnumToString(item.type), item.version );  
+            break;
+        case MDL_NODE:
+            Warning("Unknown block type: %d", item.type); 
+            break;
+        case MDL_MESH:
+            break;
+        case MDL_BONE:
+            Warning("Unknown block type: %d", item.type); 
+            break;
+        case MDL_INDICEARRAY:
+            SPrintf (result, "%s total: %d", EnumToString(item.type), item.indexcount );  
+            break;
+        case MDL_VERTEXARRAY:
+            SPrintf (result, "%s type: %s total: %d", EnumToString(item.type), EnumToString(item.datatype), item.vertexcount );  
+            break;
+        case MDL_PROPERTIES:
+            SPrintf (result, "%s  %s = %s", EnumToString(item.type), item.Properties.items[0].means, item.Properties.items[0].value);  
+            break;
+        case MDL_ANIMATIONKEYS:
+            Warning("Unknown block type: %d", item.type); 
+            break;
+        case MDL_AABB:
+            Warning("Unknown block type: %d", item.type); 
+            break;
+        case MDL_SURFACE:
+            break;
+        case MDL_NEWTONCOLLISIONTREE:
+            Warning("Unknown block type: %d", item.type); 
+            break;
+        default:
+            Warning("Unknown block type: %d", item.type);
+            break;
+    };
+    return result;
+}
+
+// File processing
+
+LittleEndian();
+
+Block mdl;

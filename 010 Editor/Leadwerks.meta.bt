@@ -1,0 +1,64 @@
+//------------------------------------------------
+//--- 010 Editor v8.0.1 Binary Template
+// This file is part of the LeadwerksRev distribution
+// https://github.com/ilodev/LeadwerksRev or http://LeadwerksRev.github.io).
+// Copyright (c) 2019 Inaki Lopez
+//
+//      File: Leadwerks.meta.bt
+//    Author: Inaki Lopez
+//   Version: 0.1
+//   Purpose: Leadwerks metadataa (meta) File parser
+//  Category: Games
+// File Mask: *.meta
+//  ID Bytes: 
+//   History: 
+//      0.1   2019-02-18 Inaki Lopez: Initial revision
+//------------------------------------------------
+
+typedef enum<UINT> {
+    META_UNKNOWN = 0,
+    META_SMALL = 5, // Unknown purpose
+    META_LARGE = 6, // Unknown purpose
+    META_STRING = 8
+} META_DATATYPE;
+
+typedef struct {
+    META_DATATYPE type;
+    switch (type) {
+       case META_UNKNOWN: // Also empty..
+           break;
+
+       case META_STRING: // 0d 0a separated name - value
+           local int64 current = FTell();
+           local int64 offset = 0;
+           while(ReadByte(current + offset) >= 0x0a) {
+             offset++;
+           }
+           unsigned char data[offset];
+           break;
+
+       case META_SMALL:  // No idea what is it used for
+           unsigned char data[0x1000];
+           break;
+
+       case META_LARGE:  // No idea what is it used for
+           unsigned char data[0x4000];
+           break;
+
+       default:
+           break;
+    };
+} Block<optimize=false>;
+
+// File processing
+LittleEndian();
+
+unsigned char magic[4]<format=hex>;
+
+// A metadata file has 2 data blocks, one is for attributes and 
+// the second one is for transformation data. Each block might
+// have one or more data arrays.
+struct {
+    unsigned int count;
+    Block data[count]<optimize=false>;
+} metadata[2]<optimize=false>;

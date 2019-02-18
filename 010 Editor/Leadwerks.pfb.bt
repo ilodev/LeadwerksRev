@@ -1,0 +1,59 @@
+//--------------------------------------
+//--- 010 Editor v6.0.3 Binary Template
+// This file is part of the LeadwerksRev distribution
+// https://github.com/ilodev/LeadwerksRev or http://LeadwerksRev.github.io).
+// Copyright (c) 2019 Inaki Lopez
+//
+//      File: Leadwerks.pfb.bt
+//    Author: Inaki Lopez
+//   Version: 0.1
+//   Purpose: Leadwerks Prefab (pfb) File parser
+//  Category: Games
+// File Mask: *.pfb
+//  ID Bytes: 53 43 45 4E // SCEN
+//      Note: a prefab is a reduced .map SCEN file.
+//   History: 
+//      0.1   2019-02-18 Inaki Lopez: Initial revision
+//------------------------------------------------
+
+// NOTE: WIP, initial structure guessing
+
+LittleEndian();
+
+typedef struct {
+   char magic[4];
+   unsigned int version;
+   unsigned int strzoffset;
+   unsigned int strzmayberelated;
+   unsigned int stuff1offset;
+   unsigned int stuff2offset;
+   unsigned int stuff3offset;
+   unsigned int endoffset; // at this position there is a 0.. maybe for full scene?
+} Header<optimize=false>;
+
+// File processing
+
+Header header;
+
+struct {
+   unsigned int stuff5offset;
+   unsigned int mdldatasize;
+   unsigned int stuff7offset;
+   unsigned int sizeofsomething;
+   unsigned char geometrydata[mdldatasize];
+} geometry;
+
+struct {
+  unsigned int int3;
+  unsigned char data[header.stuff1offset - header.strzoffset - 4];
+} strzpool;
+
+unsigned char fixeblock[224];
+
+struct {
+  unsigned int int3;
+  local int64 pos = FTell();
+  unsigned char data[header.endoffset - pos];
+} closure;
+
+unsigned int32 zero;
