@@ -16,6 +16,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+//https://github.com/KellanHiggins/UnityFBXExporter/blob/master/Assets/Packages/UnityFBXExporter/FBXExporter.cs
+//https://banexdevblog.wordpress.com/2014/06/23/a-quick-tutorial-about-the-fbx-ascii-format/
+//https://www.ics.uci.edu/~djp3/classes/2014_03_ICS163/tasks/arMarker/Unity/arMarker/Assets/CactusPack/Meshes/Sprites/Rock_Medium_SPR.fbx
+//http://help.autodesk.com/view/FBX/2017/ENU/?guid=__files_GUID_8A69CD20_B8FB_4B23_925A_372E408390AA_htm
+
+//http://www.martinreddy.net/gfx/3d/OBJ.spec
+//https://en.wikipedia.org/wiki/Wavefront_.obj_file
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>

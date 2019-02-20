@@ -24,17 +24,60 @@ typedef struct {
    char magic[4];
    unsigned int version;
    unsigned int strzoffset;
-   unsigned int strzmayberelated;
+   unsigned int objectsoffset;
    unsigned int stuff1offset;
    unsigned int stuff2offset;
    unsigned int stuff3offset;
    unsigned int endoffset; // at this position there is a 0.. maybe for full scene?
-} Header<optimize=false>;
+} Header<optimize=false, read=header_read>;
+string header_read(local Header &item) {
+string result;
+  SPrintf(result, "Map version %d.%d", item.version / 10, item.version%10);
+return result;
+}
 
 // File processing
 
 Header header;
 
+typedef struct {
+    int size;
+    int index;
+    char data[size-4];
+} thingy<optimize=false,read=thingy_read>;
+
+struct {
+  int32 count;
+  thingy data[count]<optimize=false,read=thingy_read>;
+} objects;
+string thingy_read(local thingy &item) {
+local string result ="";
+    local uchar  strz[128];
+    Memcpy(strz, categories.data, 128, 0, item.index);
+    SPrintf (result, "%s", strz);//strzpool.values[item.index].strz );  
+    return result;
+
+}
+
+struct {
+    unsigned char data[header.stuff3offset - header.stuff2offset];
+} struct2<optimize=false>; // starts at header.struct2offset
+
+
+struct {
+/*
+   int size;
+   struct {
+      int size;
+      char data[size];
+   }struct4[size]<optimize=false>;
+*/
+    unsigned char data[header.strzoffset - header.stuff3offset];
+} struct3<optimize=false>;
+
+
+
+/*
 struct {
    unsigned int stuff5offset;
    unsigned int mdldatasize;
@@ -42,18 +85,38 @@ struct {
    unsigned int sizeofsomething;
    unsigned char geometrydata[mdldatasize];
 } geometry;
+*/
 
 struct {
   unsigned int int3;
   unsigned char data[header.stuff1offset - header.strzoffset - 4];
-} strzpool;
+} Unknown;
 
+// If I don't include this still works on the whole file but offsets are wrong
+FSeek(header.strzoffset);
+
+typedef  struct {
+    string strz;
+} values<optimize=false,read=values_read>;
+
+
+struct {
+  unsigned int count;
+  //unsigned char data[header.stuff1offset - header.strzoffset - 4];
+  values data[count]<optimize=false,read=values_read>;
+} strzpool;
+string values_read(local values &item) {
+  return item.strz;
+}
+
+// This has always the same size / FALSE
+// in 2boxes1trigger is bigger by 36 bytes
 unsigned char fixeblock[224];
 
 struct {
   unsigned int int3;
   local int64 pos = FTell();
   unsigned char data[header.endoffset - pos];
-} closure;
+} categories;
 
 unsigned int32 zero;

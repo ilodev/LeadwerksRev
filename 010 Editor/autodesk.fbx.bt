@@ -1,0 +1,30 @@
+//--------------------------------------
+//--- 010 Editor v6.0.3 Binary Template
+//
+// File:
+// Author:
+// Revision:
+// Purpose:
+//--------------------------------------
+
+typedef  struct {
+  unsigned char  magic[21]; // "Kaydara FBX Binary  \x00"
+  unsigned short k1a00;     // 0x1a00;
+  unsigned int32 version;
+} FBXHeader;
+
+typedef struct {
+  unsigned int32 endoffset;
+  unsigned int32 numproperties;
+  unsigned int32 propertylistlen;
+  unsigned byte  namelen;
+  unsigned char name[namelen];
+  
+
+
+} FBXNode<optimize=false>;
+
+LittleEndian();
+
+FBXHeader header;
+FBXNode root;

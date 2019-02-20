@@ -42,6 +42,14 @@ int tex2dds(const char *fpath) {
 	fprintf(stderr, "tex2dds (build: %s)\n", SRCVERSION);
 #endif
 
+	// last minute check to avoid San pointing out a mem overwrite
+	if (strlen(fpath < 5)) {
+#ifdef DEBUG
+		fprintf(stderr, "file name not long enough, is this even a texture?\n");
+#endif
+		return error(fpath);
+	}
+
 	// check the file exists
 	struct stat st;
 	if (stat(fpath, &st) == -1 || st.st_size < sizeof(struct tex_header)) {
