@@ -1,0 +1,288 @@
+//--------------------------------------
+//--- 010 Editor v6.0.3 Binary Template
+// This file is part of the LeadwerksRev distribution
+// https://github.com/ilodev/LeadwerksRev or http://LeadwerksRev.github.io).
+// Copyright (c) 2019 Inaki Lopez
+//
+//      File: Leadwerks.scn.bt
+//    Author: Inaki Lopez
+//   Version: 0.1
+//   Purpose: Leadwerks Map and Prefab File parser
+//  Category: Games
+// File Mask: *.pfb. *.map
+//  ID Bytes: 53 43 45 4E // SCEN
+//      Note: a prefab is a reduced .map SCEN file that doesn't contain 
+//            terrain or struct3.
+//   History: 
+//      0.1   2019-02-18 Inaki Lopez: Initial revision
+//------------------------------------------------
+
+// NOTE: WIP, initial structure guessing
+
+LittleEndian();
+
+typedef struct {
+   char magic[4];
+   unsigned int version;
+   unsigned int strzoffset;
+   unsigned int objectsoffset;
+   unsigned int maprootoffset;
+   unsigned int terrainoffset;
+   unsigned int stuff3offset;
+   unsigned int endoffset; // at this position there is a 0.. maybe for full scene?
+} Header<optimize=false, read=header_read>;
+string header_read(local Header &item) {
+string result;
+  SPrintf(result, "Scene version %d.%d", item.version / 10, item.version%10);
+return result;
+}
+
+typedef struct {
+  float x;
+  float y;
+  float z;
+} vec3<optimize=false, read=vec3_read>;
+string vec3_read(local vec3 &item){
+string result;
+  SPrintf(result, "(%f, %f, %f)", item.x, item.y, item.z); 
+  return result;
+}
+
+// The position vector3 is divided by 10.0 
+typedef struct {
+  float x;
+  float y;
+  float z;
+} vec3_pos<optimize=false, read=vec3_pos_read>;
+string vec3_pos_read(local vec3_pos &item){
+string result;
+  SPrintf(result, "(%f, %f, %f)", item.x * 10, item.y * 10, item.z * 10); 
+  return result;
+}
+
+typedef struct {
+  float r;
+  float g;
+  float b;
+  float a;
+} vec4<optimize=false, read=vec4_read>;
+string vec4_read(local vec4 &item){
+string result;
+  SPrintf(result, "(%1.0f, %1.0f, %1.0f, %1.0f)", item.r * 255, item.g * 255, item.b * 255, item.a * 255); 
+  return result;
+}
+
+//fwd declaration
+struct Object;
+
+typedef struct {
+ unsigned int32 size; // size in bytes of this block
+ local int64 startpos = FTell();
+ unsigned int32 type; // 0x0d is object (mdl), 4 is light
+ unsigned int32 unk2; // id in the strzpool for the origin
+ unsigned int32 unk3;  
+ int32 cast_shadows; // 1 static, 3 static + dynamic
+ vec3_pos position; // Position values are / by 100
+ vec3 rotation; // Rotation values match
+ vec3 unknown;
+ float unknown;
+ vec3 scale;
+ vec3 vunknown1;
+ vec3 vunknown2;
+ vec3 vunknown3;
+ vec3 vunknown4;
+ vec3_pos test;
+ float funknown1;
+ int iunknown2;    // THIS ONE MAKES THE APPAERANCE AND PHYSICS GO: instanced prefab
+ unsigned int32 nameindex; // Index of the strzpool for the name
+ struct {
+    vec4 diffuse;
+    float dbrigthness;
+    vec4 specular;
+    float sbrigthness;
+    vec4 color;
+ 
+    int skip1;
+    int skip2;
+    int material; //-1  // id of the string in the strzpool
+    int hidden;
+ } appearance;
+ struct {
+   int navobstacle;
+   unsigned int collision_mode; // 1 rigid body, 2 character controller
+   float mass;
+   int unknown1;
+   int unknown2;
+   int unknown3;
+   int unknown4;
+   int unknown5;
+   int unknown6;
+   int unknown7;
+   vec3 vunknown;
+   int unknown8;
+   int unknown9;
+   int neg; // found -1
+   int swept_collision;
+   int collision_type;
+   float character_angle;
+   
+ } physics;
+ 
+ int view_range; // 1 medium, 3 max
+ int occlusion_culling;
+ unsigned int unknown000; 
+ struct {
+   int chunksize;
+   int Unknown00;   // int scriptid from strz table or something
+   char data[chunksize - 4]; // size and attributes of this data depend on the script
+   // int unkno;
+   // int unkno;
+   // int index; // the index of the strzpool for the script name
+ } script<optimize=false>; // this is always x14?
+
+ switch (type) {
+   //case 0x01: // compound (tube etc)
+   //break;
+   case 0x02: // model (mdl) no geometry
+        int prim_unknown0;
+        int prim_unknown1;
+        int prim_unknown2;
+        int prim_unknown3;
+        int prim_unknown4;
+   case 0x03: // camera
+        float FOV;
+        float rangemin;
+        float rangemax;
+        unsigned int posteffects; //???
+        unsigned int rendertarget1;
+        unsigned int rendertarget; // changed from -1 to 1 with render target
+        break;
+   case 0x04: // light
+        float default_range; 
+        float volume_effect;
+        break;
+   // case 0x0d: // primitive (with geometry)
+   // break;
+   // case 0x13: // texture?
+   // break;
+   // case 0x14: // particle emitter, adds 180 bytes for particle info
+   // break;
+   case 0x1c: // sprite or alike
+        int viewmode; //0 billboard,  1 x, ..
+        float sizemin; 
+        float sizemax; 
+        break;  
+   break;
+   default:
+     local int64 current = FTell();
+     unsigned char data[size - (current - startpos) - 12];
+   break;
+ };
+ 
+ int group; //0 brushes,  1 models , 2 entities
+ unsigned int unknownxx;
+ unsigned int childcount;
+ if (childcount) {
+  struct {
+      Object child[childcount];
+  }childs<optimize=false>;
+
+ } 
+} Object<optimize=false, read=Object_read>;
+string Object_read(local Object &item) {
+string mat = "";
+string group = strzpool.data[ item.group ].strz;
+string result;
+
+    if (item.appearance.material > 0) {
+     SPrintf(mat, "%s", strzpool.data[ item.appearance.material ].strz);
+    }
+
+    SPrintf(result, " %s > %s - type:%d - childs:%d - mat: %s", group, strzpool.data[ item.nameindex ].strz, item.type, item.childcount, mat);
+    return result;
+}
+
+
+
+// File processing
+
+// Regular vector3 struct
+Header header;
+
+// Objects structure
+struct {
+  int32 count;
+  Object data[count]<optimize=false>;
+} objects;
+
+// Terrain goes immediatelly after
+struct {
+    // int32 size; // end terrain is size x size
+    // float unknown4; // 
+    // float height;
+    // float unknownc; // with unknown4, these two were always 1 
+    // char data[ size * size * 2];
+    // 2097204
+    // struct {
+    // float scale;
+    // float minslope;
+    // float maxslope;
+    // float slopetransition;
+    // float minheight;
+    // float maxheight;
+    // height transition;
+    // float unknownfloat;
+    // int mappingtype; // 0 flat, 1 vertical etc
+    // int unknownto01;
+    // ascii_da text1
+    // ascii_da text2
+    // ascii_da text3   // texture names ending in 0d0a, with  8 bytes of 0x00 after
+    // } paintbrush[16];
+    unsigned char data[header.stuff3offset - header.terrainoffset];
+} terrain<optimize=false>; // starts at header.struct2offset
+
+
+struct {
+/*
+   int size;
+   struct {
+      int size;
+      char data[size];
+   }struct4[size]<optimize=false>;
+*/
+    unsigned char data[header.strzoffset - header.stuff3offset];
+} struct3<optimize=false>; // seems to be in all maps, even empty one.
+
+
+typedef  struct {
+    string strz;
+} values<optimize=false,read=values_read>;
+struct {
+  unsigned int count;
+  //unsigned char data[header.stuff1offset - header.strzoffset - 4];
+  values data[count]<optimize=false,read=values_read>;
+} strzpool;
+string values_read(local values &item) {
+  return item.strz;
+}
+
+struct {
+  unsigned int unknown0;
+  unsigned int unknown4;
+  vec3 funknown8;
+  float funknown10;
+  float mapside;
+  float gravity;
+  unsigned char data[header.endoffset - FTell()];
+} mapinfo; // Root node on the scene
+
+
+
+// This is probably another block not seen yet
+struct {
+    unsigned int32 size;
+    if (size) {
+        unsigned char data[size];
+        // unsigned char data[FileSize() - FTell()];
+    }
+} Unknownstruct<optimize=false>;
