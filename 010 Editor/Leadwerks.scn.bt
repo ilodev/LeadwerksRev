@@ -19,17 +19,27 @@
 
 // NOTE: WIP, initial structure guessing
 
-LittleEndian();
+typedef enum <int32> {
+   LW_PIVOT = 1, // used for playerstart?, also simplest object
+   LW_MODEL = 2,
+   LW_CAMERA = 3,
+   LW_LIGHT = 4,
+   LW_SHAPE = 13,
+   LW_PARTICLE = 0x14,
+   LW_SPRITE = 0x1c
+} LW_OBJECTTYPE;
+
+
 
 typedef struct {
    char magic[4];
    unsigned int version;
-   unsigned int strzoffset;
-   unsigned int objectsoffset;
-   unsigned int maprootoffset;
-   unsigned int terrainoffset;
-   unsigned int stuff3offset;
-   unsigned int endoffset; // at this position there is a 0.. maybe for full scene?
+   unsigned int strzoffset;    // offset in file of the strz pool
+   unsigned int objectsoffset; // offset in file of the object array
+   unsigned int maprootoffset; // offset in file of the map root node
+   unsigned int terrainoffset; // offset in file of the terrain info
+   unsigned int stuff3offset;  // offset in file of this struct
+   unsigned int endoffset;     // offset in file of this struct
 } Header<optimize=false, read=header_read>;
 string header_read(local Header &item) {
 string result;
@@ -72,6 +82,29 @@ string result;
   return result;
 }
 
+
+// Definition of a script and its info, script attributes data is found
+// inside the extra array and they are dependdant of the script.
+typedef struct {
+  int size;
+  int Unknown04;   // int scriptid from strz table or something
+  int Unknown08;
+  int Unknown0c;
+  int nameindex;   // the index of the strzpool for the script name
+  int Unknown14;
+  local int extrasize = size - 0x14; // extrasize doesn't include size
+  if (extrasize > 0) {
+    char extra[extrasize]; // size and attributes of this data
+  }
+} Script<optimize=false,read=Script_read>;
+string Script_read(local Script &item){
+string result;
+    if (item.nameindex > 0) {
+      SPrintf(result, "%s", strzpool.data[ item.nameindex ].strz);
+    }
+    return result;
+}
+
 //fwd declaration
 struct Object;
 
@@ -81,6 +114,7 @@ typedef struct {
  unsigned int32 type; // 0x0d is object (mdl), 4 is light
  unsigned int32 unk2; // id in the strzpool for the origin
  unsigned int32 unk3;  
+ struct {
  int32 cast_shadows; // 1 static, 3 static + dynamic
  vec3_pos position; // Position values are / by 100
  vec3 rotation; // Rotation values match
@@ -93,62 +127,69 @@ typedef struct {
  vec3 vunknown4;
  vec3_pos test;
  float funknown1;
+ } general;
  int iunknown2;    // THIS ONE MAKES THE APPAERANCE AND PHYSICS GO: instanced prefab
  unsigned int32 nameindex; // Index of the strzpool for the name
- struct {
-    vec4 diffuse;
-    float dbrigthness;
-    vec4 specular;
-    float sbrigthness;
-    vec4 color;
- 
-    int skip1;
-    int skip2;
-    int material; //-1  // id of the string in the strzpool
-    int hidden;
- } appearance;
- struct {
-   int navobstacle;
-   unsigned int collision_mode; // 1 rigid body, 2 character controller
-   float mass;
-   int unknown1;
-   int unknown2;
-   int unknown3;
-   int unknown4;
-   int unknown5;
-   int unknown6;
-   int unknown7;
-   vec3 vunknown;
-   int unknown8;
-   int unknown9;
-   int neg; // found -1
-   int swept_collision;
-   int collision_type;
-   float character_angle;
-   
- } physics;
- 
- int view_range; // 1 medium, 3 max
- int occlusion_culling;
- unsigned int unknown000; 
- struct {
-   int chunksize;
-   int Unknown00;   // int scriptid from strz table or something
-   char data[chunksize - 4]; // size and attributes of this data depend on the script
-   // int unkno;
-   // int unkno;
-   // int index; // the index of the strzpool for the script name
- } script<optimize=false>; // this is always x14?
+ if (iunknown2 == 1) {
+   unsigned int unknowni01;
+   unsigned int unknowni02;
+   unsigned int unknowni03;
+   unsigned int unknowni04;
+   unsigned int unknowni05;
+   unsigned int unknowni06;
+ } else {
+     struct {
+        vec4 diffuse;
+        float dbrigthness;
+        vec4 specular;
+        float sbrigthness;
+        vec4 color;
+     
+        int skip1;
+        int skip2;
+        int material; //-1  // id of the string in the strzpool
+        int hidden;
+     } appearance;
+     struct {
+       int navobstacle;
+       unsigned int collision_mode; // 1 rigid body, 2 character controller
+       float mass;
+       int unknown1;
+       int unknown2;
+       int unknown3;
+       int unknown4;
+       int unknown5;
+       int unknown6;
+       int unknown7;
+       vec3 vunknown;
+       int unknown8;
+       int unknown9;
+       int neg; // found -1
+       int swept_collision;
+       int collision_type;
+       float character_angle;
+       
+     } physics;
+     
+     struct {
+     int view_range; // 1 medium, 3 max
+     int occlusion_culling;
+     unsigned int unknown000; 
+     } visibility;
+
+     Script script;
+
+ }
 
  switch (type) {
-   //case 0x01: // compound (tube etc)
-   //break;
+   case 0x01: // compound: or pivot
+        break;
    case 0x02: // model (mdl) no geometry
         int prim_unknown0;
         int prim_unknown1;
         int prim_unknown2;
         int prim_unknown3;
-        int prim_unknown4;
+        break;
    case 0x03: // camera
         float FOV;
         float rangemin;
@@ -157,9 +198,21 @@ typedef struct {
         unsigned int rendertarget1;
         unsigned int rendertarget; // changed from -1 to 1 with render target
         break;
-   case 0x04: // light
+   case 0x04: // Directional light
         float default_range; 
         float volume_effect;
+        break;
+   case 0x05: // Spot light
+        float range_max; 
+        float spot_angle1;
+        float spot_angle2;
+        float volumen_effect;
+        break;
+   case 0x06: // point light
+        float range_max; 
+        float volume_effect;
+        break;
+   case 0x07: // listener
         break;
    // case 0x0d: // primitive (with geometry)
    // break;
@@ -175,26 +228,33 @@ typedef struct {
    break;
    default:
      local int64 current = FTell();
-     unsigned char data[size - (current - startpos) - 12];
+     local int64 extrasize = size - (current - startpos) - 12;
+     if (extrasize > 0) {
+       unsigned char data[size - (current - startpos) - 12];
+     }
    break;
  };
  
- int group; //0 brushes,  1 models , 2 entities
+ int group; // Scene group this object belongs to: brushes, models, entities, etc
  unsigned int unknownxx;
- unsigned int childcount;
+ 
+ unsigned int childcount; // Some object can have childs attached
  if (childcount) {
-  struct {
-      Object child[childcount];
-  }childs<optimize=false>;
-
- } 
+     struct {
+         Object child[childcount];
+     } childs<optimize=false>;
+ }
+ 
 } Object<optimize=false, read=Object_read>;
 string Object_read(local Object &item) {
 string mat = "";
-string group = strzpool.data[ item.group ].strz;
+string group = "";
 string result;
 
-    if (item.appearance.material > 0) {
+    if (item.group >= 0) {
+       group = strzpool.data[ item.group ].strz;
+    }
+    if ( item.iunknown2 == 0 && item.appearance.material > 0) {
      SPrintf(mat, "%s", strzpool.data[ item.appearance.material ].strz);
     }
 
@@ -204,42 +264,93 @@ string result;
 
 
 
+
+// ascii string finishing in 0x0d0a;
+typedef struct {
+  local int len = 0;
+  local int pos = FTell();
+  while (ReadByte(pos + len) != 0) {
+    len++;
+  }
+  if (len > 0) {
+    char strz[len];
+  } else {
+    char strz[1];
+  }
+  unsigned int unkown1;
+  unsigned int unkown2;
+} asciida<optimize=false, read=asciida_read>;
+
+string asciida_read(local asciida &item) {
+string result;
+    return result;
+};
+
+// Terrain goes immediatelly after
+typedef struct {
+   int32 size; // end terrain is size x size
+   if (size > 0) {
+     float unknown4; // 
+     float height;
+     float unknownc; // with unknown4, these two were always 1 
+     char terraindata[ size * size * 2];
+      struct {
+        float scale;
+        float minslope;
+        float maxslope;
+        float slopetransition;
+        float minheight;
+        float maxheight;
+        float heighttransition;
+        float unknownfloat;
+        int mappingtype; // 0 flat, 1 vertical etc
+        int unknownto01;
+        asciida text1;
+        asciida text2;
+        asciida text3;  // texture names ending in 0d0a, with  8 bytes of 0x00 after
+     } paintbrush[16]<optimize=false>;
+
+     struct {
+         unsigned int head[5];
+         unsigned char terraindif[ size * size * 4];
+     } definition;
+   }
+    //unsigned char data[header.stuff3offset - FTell()];
+} Terrain<optimize=false,read=terrain_read>; // starts at header.struct2offset
+string terrain_read(local Terrain &item) {
+string result = "No terrain";
+   if (item.size > 0) {
+      SPrintf(result, "(%d x %d) height: %f", item.size, item.size, item.height);
+   }
+   return result;
+}
+
 // File processing
+// File processing starts here
+
+LittleEndian();
 
 // Regular vector3 struct
 Header header;
 
 // Objects structure
-struct {
+typedef struct {
   int32 count;
-  Object data[count]<optimize=false>;
-} objects;
+  if (count>0) {
+    Object data[count]<optimize=false>;
+  };
+} Objects<optimize=false, read=objects_read>;
+string objects_read(local Objects &item) {
+string result = "No objects";
+   if (item.count > 0) {
+      SPrintf(result, "%d objects", item.count);
+   };
+   return result;
+}
+Objects objects;
 
-// Terrain goes immediatelly after
-struct {
-    // int32 size; // end terrain is size x size
-    // float unknown4; // 
-    // float height;
-    // float unknownc; // with unknown4, these two were always 1 
-    // char data[ size * size * 2];
-    // 2097204
-    // struct {
-    // float scale;
-    // float minslope;
-    // float maxslope;
-    // float slopetransition;
-    // float minheight;
-    // float maxheight;
-    // height transition;
-    // float unknownfloat;
-    // int mappingtype; // 0 flat, 1 vertical etc
-    // int unknownto01;
-    // ascii_da text1
-    // ascii_da text2
-    // ascii_da text3   // texture names ending in 0d0a, with  8 bytes of 0x00 after
-    // } paintbrush[16];
-    unsigned char data[header.stuff3offset - header.terrainoffset];
-} terrain<optimize=false>; // starts at header.struct2offset
+
+Terrain terrain<optimize=false,read=terrain_read>; // starts at header.struct2offset
 
 
 struct {
@@ -257,14 +368,25 @@ struct {
 typedef  struct {
     string strz;
 } values<optimize=false,read=values_read>;
-struct {
-  unsigned int count;
-  //unsigned char data[header.stuff1offset - header.strzoffset - 4];
-  values data[count]<optimize=false,read=values_read>;
-} strzpool;
 string values_read(local values &item) {
   return item.strz;
 }
+typedef struct {
+  unsigned int count;
+  //unsigned char data[header.stuff1offset - header.strzoffset - 4];
+  if (count > 0) {
+    values data[count]<optimize=false,read=values_read>;
+  };
+} Strzpool<optimize=false,read=Strzpool_read>;
+string Strzpool_read(local Strzpool &item) {
+string result = "No data";
+  if (item.count > 0) {
+    SPrintf(result, "%d strings", item.count);
+  };
+  return result;
+}
+
+Strzpool strzpool;
 
 struct {
   unsigned int unknown0;
@@ -274,7 +396,7 @@ struct {
   float mapside;
   float gravity;
   unsigned char data[header.endoffset - FTell()];
-} mapinfo; // Root node on the scene
+} maproot; // Root node on the scene
 
 
 
